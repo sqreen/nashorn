@@ -1,0 +1,3 @@
+io.sqreen.dynalink.test.UntrustedGuardingDynamicLinkerExporter
+io.sqreen.dynalink.test.TrustedGuardingDynamicLinkerExporter
+io.sqreen.dynalink.test.TrustedUnderscoreNameLinkerExporter

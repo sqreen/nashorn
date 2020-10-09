@@ -1,0 +1,342 @@
+import org.apache.tools.ant.filters.*
+
+plugins {
+    id 'java-library'
+    id 'de.undercouch.download' version '4.1.1'
+}
+
+version = '14.0.31'
+
+allprojects {
+    repositories {
+        jcenter()
+    }
+
+    compileJava {
+        options.javaModuleVersion = provider { project.version }
+//        options.compilerArgs += []
+    }
+}
+
+sourceCompatibility = 14
+targetCompatibility = 14
+
+java {
+    modularity.inferModulePath = true
+}
+
+configurations {
+    jemmy
+}
+
+dependencies {
+    testImplementation 'org.testng:testng:7.2.0'
+    testImplementation project('jjs')
+    implementation project('asm')
+
+//    jemmy project('jemmy')
+}
+
+sourceSets {
+    main {
+        output.resourcesDir = java.outputDir
+    }
+    unnamedModuleTest {}
+    test {
+        output.resourcesDir = java.outputDir
+    }
+}
+
+def nasgenOutput = "${project.buildDir}/classes/java/nasgen"
+sourceSets.main.output.dir nasgenOutput
+tasks.create(name: 'runNasgen', type: GradleBuild, dependsOn: compileJava) {
+    group = 'Build tasks'
+    description = 'Run nasgen to generate classes'
+
+    doFirst {
+        mkdir nasgenOutput
+    }
+
+    def classesDir = sourceSets.main.java.classesDirectory.get()
+    inputs.dir classesDir
+    outputs.dir nasgenOutput
+
+    startParameter = startParameter.newInstance()
+    startParameter.projectProperties = [
+            args: [classesDir, 'io.sqreen.nashorn.internal.objects', nasgenOutput],
+            workingDir: project.buildDir,
+    ]
+    tasks = [':nasgen:run']
+}
+
+jar {
+    dependsOn('runNasgen')
+    exclude {
+        File f = it.file
+        def matcher = f.toString() =~ '.*main/(io/sqreen/nashorn/internal/objects/[^/]+\\.class)'
+        if (!matcher.matches()) {
+            return false // include
+        } else {
+            file("$nasgenOutput/${matcher.group(1)}").exists()
+        }
+    }
+}
+
+task internalTestsJar(type: Jar) {
+    from sourceSets.test.output
+    include '**/internal/**',
+            '**/dynalink/test/Trusted**',
+            '**/test/tools/**',
+            '**/models/**',
+            '**/META-INF/**'
+
+    archiveBaseName = 'internalTests'
+}
+
+task apiTestsJar(type: Jar) {
+    from sourceSets.test.output, sourceSets.unnamedModuleTest.output
+    include '**/api/**',
+            '**/META-INF/**',
+            '**/dynalink/**',
+            '**/resources/*.js',
+            '**/UnnamedPackage**'
+    exclude '**/dynalink/test/Trusted**'
+
+    archiveBaseName = 'apiTests'
+}
+
+processResources {
+    rename '(.*)\\.template$', '$1'
+    filter ReplaceTokens, tokens: [
+        VERSION_SHORT: project.version,
+        VERSION_STRING: "nashorn ${project.version} (out-of-tree)".toString()
+    ]
+}
+
+def policyDir = "${project.buildDir}/target/policies"
+task policyResources(type: Copy) {
+    from 'src/test/policies'
+    into policyDir
+
+    Set<File> testDeps = configurations['testRuntimeClasspath'].resolve()
+
+    def workerJar = "${gradle.gradleUserHomeDir}/caches/${gradle.gradleVersion}/workerMain/gradle-worker.jar"
+    if (!file(workerJar).exists()) {
+        logger.warn("worker jar not found at ${workerJar}. Tests will not work correctly")
+    }
+
+    def gradlePrivateJar = { String name, version = null->
+        String pattern = "**/${name}-${version ?: gradle.gradleVersion}.jar"
+        def jars = fileTree(gradle.gradleHomeDir).include(pattern).files
+        if (jars.empty) {
+            logger.warn("worker processes jar not found in " +
+                    "${gradle.gradleUserHomeDir}/${pattern} " +
+                    "Tests will not work correctly")
+            null
+        } else {
+            jars.first()
+        }
+    }
+
+    def jarForDep = { String name ->
+        testDeps.find { it.toString().contains(name) }.toString()
+    }
+
+    expand([
+            projectDir: projectDir,
+            userDir: System.getProperty('user.dir'),
+            sourceSets: sourceSets,
+            nasgenOutput: nasgenOutput,
+            internalTestsJar: tasks['internalTestsJar'].archivePath.path,
+            apiTestsJar: tasks['apiTestsJar'].archivePath.path,
+            testngJar: jarForDep('testng'),
+            snakeyamlJar: jarForDep('snakeyaml'),
+            jcommanderJar: jarForDep('jcommander'),
+            scriptDir: "$projectDir/test/nashorn/script",
+            gradleWorkerJar: workerJar,
+            gradleWorkerProcessesJar: gradlePrivateJar('gradle-worker-processes'),
+            gradleLoggingJar: gradlePrivateJar('gradle-logging'),
+            gradleBaseServicesJar: gradlePrivateJar('gradle-base-services'),
+            gradleNativeJar: gradlePrivateJar('gradle-native'),
+            gradleMessagingJar: gradlePrivateJar('gradle-messaging'),
+            jul2slf4jJar: gradlePrivateJar('jul-to-slf4j', '*'),
+            gradleTestingBaseJar: gradlePrivateJar('gradle-testing-base'),
+            gradleTestingJvmJar: gradlePrivateJar('gradle-testing-jvm'),
+    ])
+}
+
+def codeCacheDir = 'build/nashorn_code_cache'
+task deleteCodeCache(type: Delete) {
+    file(codeCacheDir).list().each { f->
+        delete "$codeCacheDir/$f"
+    }
+}
+
+test {
+    include '**/*Test.class'
+    exclude '**/framework/*Test.class'
+    systemProperties(
+            'test.basic.dir': 'test/nashorn/script/basic',
+            'test262.suite.dir': 'test/test262',
+            'compilertest.test262': false,
+    )
+    ext.withSecurityManager = true
+
+    dependsOn deleteCodeCache
+}
+
+task testScripts(type: Test) {
+    include '**/framework/*Test.class'
+    systemProperties(
+            'test.js.framework': 'test/nashorn/script/assert.js',
+            'test.js.roots': ['basic', 'maptests', 'error', 'sandbox', 'trusted'].collect {
+                "test/nashorn/script/$it"
+            }.join(' ')
+    )
+    ext.withSecurityManager = true
+}
+
+task testMarkdown(type: Test) {
+    include '**/framework/*Test.class'
+
+    systemProperty 'test.js.roots', 'test/nashorn/script/markdown'
+    systemProperty 'test.js.framework', 'test/nashorn/script/markdown.js'
+
+    task copyShowdown(type: Download) {
+        src([
+                'https://raw.githubusercontent.com/showdownjs/showdown/0.5.4/src/showdown.js',
+                'https://raw.githubusercontent.com/showdownjs/showdown/0.5.4/src/extensions/table.js'])
+        dest 'test/nashorn/script/external/showdown'
+        overwrite false
+    }
+    ext.withSecurityManager = true
+
+    dependsOn copyShowdown
+    tasks['check'].dependsOn it
+}
+
+// TODO: requires dependencies the right version of which I can't find
+task testJfx(type: Test) {
+    include '**/framework/*Test.class'
+    systemProperties(
+            'test.js.roots': 'test/nashorn/script/jfx',
+            'test.js.sharedcontext': false,
+            'test.js.framework': 'test/nashorn/script/jfx.js'
+    )
+
+    classpath += configurations.getByName('jemmy')
+
+//    tasks['check'].dependsOn it
+}
+
+task testNoSecurity(type: Test) {
+    evaluationDependsOn('jjs')
+
+    def jPackageImageTask = project(':jjs').tasks['jpackageImage']
+    include '**/framework/*Test.class'
+    systemProperties(
+            'test.js.roots': 'test/nashorn/script/nosecurity',
+            'test.js.sharedcontext': false,
+            'test.js.framework': 'test/nashorn/script/assert.js',
+            'nashorn.jar': jar.archivePath.path,
+            'jjs.executable': "${jPackageImageTask.imageDir}/bin/jjs".toString(),
+    )
+    dependsOn jPackageImageTask
+
+    dependsOn jar // for JDK-8050964.js
+    systemProperty 'nashorn.jar', jar.archivePath
+    systemProperty 'asm.jar', project('asm').tasks['jar'].archivePath
+
+    tasks['check'].dependsOn it
+}
+
+tasks.withType(Test).each { Task t ->
+    t.configure {
+        outputs.upToDateWhen { false }
+        doFirst {
+            // some tests expect this directory to exist
+            mkdir 'build/test'
+            mkdir codeCacheDir
+        }
+        useTestNG()
+
+        if (project.hasProperty('test.js.list')) {
+            systemProperty 'test.js.list', project."test.js.list"
+        }
+        systemProperties(
+                'file.encoding': 'UTF-8',
+                // TODO somehow automate this. Maybe in script runner copy JVM args from origin JVM
+//                'test.fork.jvm.options': "--module-path ${sourceSets.main.java.outputDir}:" +
+//                        "${sourceSets.test.java.outputDir}:" +
+//                        "${project('asm').tasks['jar'].archivePath}:" +
+//                        ""
+        )
+        def exportedInternalPackages = [
+                'io.sqreen.nashorn.internal.ir',
+                'io.sqreen.nashorn.internal.codegen',
+                'io.sqreen.nashorn.internal.parser',
+                'io.sqreen.nashorn.internal.objects',
+                'io.sqreen.nashorn.internal.runtime',
+                'io.sqreen.nashorn.internal.runtime.doubleconv',
+                'io.sqreen.nashorn.internal.runtime.linker',
+                'io.sqreen.nashorn.internal.runtime.events',
+                'io.sqreen.nashorn.internal.runtime.options',
+                'io.sqreen.nashorn.internal.runtime.regexp',
+                'io.sqreen.nashorn.internal.runtime.regexp.joni',
+                'io.sqreen.nashorn.tools',
+        ]
+        def openedInternalPackages = [
+                'io.sqreen.nashorn.internal.runtime',
+                'io.sqreen.nashorn.internal.runtime.doubleconv'
+        ]
+
+        jvmArgs += [
+                '-esa','-ea', // assertions
+                "--patch-module=io.sqreen.nashorn=$nasgenOutput",
+                '-Xverify:all',
+                '-Xmx2G',
+                '--add-modules=java.sql'
+//                '-Xlog:all=debug:file=/tmp/j.log:uptimemillis,pid:filecount=1,filesize=500m'
+        ] + exportedInternalPackages.collect { "--add-exports=io.sqreen.nashorn/$it=ALL-UNNAMED" } +
+                openedInternalPackages.collect { "--add-opens=io.sqreen.nashorn/$it=ALL-UNNAMED" }
+
+        dependsOn internalTestsJar, apiTestsJar
+        classpath += files(tasks['internalTestsJar'].archivePath)
+        classpath += files(tasks['apiTestsJar'].archivePath)
+        // we want instead the two jars on the classpath
+        classpath -= sourceSets.test.output
+        classpath -= files(nasgenOutput) // already used in patching io.sqreen.nashorn module
+
+//        // add nashorn and asm instead via --upgrade-module-path
+//        modularity.inferModulePath = false
+//        classpath -= sourceSets.main.output
+//        // the jars get on the classpath as well idk how. remove them
+//        def asmJar = project('asm').tasks['jar'].archivePath.path
+//        classpath -= files(tasks['jar'].archivePath)
+//        classpath -= files(asmJar)
+//        jvmArgs += ["--upgrade-module-path=${sourceSets.main.java.outputDir}:" + asmJar]
+//        dependsOn ':asm:jar'
+
+//        jvmArgs += "-javaagent:${project('agent').tasks['jar'].archivePath}"
+//        dependsOn ':agent:jar'
+
+        if (t.ext.find('withSecurityManager')) {
+            dependsOn policyResources
+            jvmArgs += [
+                    '-Djava.security.manager',
+                    "-Djava.security.policy=${policyDir}/nashorn.policy",
+                    "-Djava.security.properties=${policyDir}/nashorn.security.properties",
+            ]
+//            systemProperty 'test.fork.jvm.options', forkJvmArgs
+        }
+        dependsOn runNasgen
+    }
+}
+
+//def patchArgs = ['--patch-module', "io.sqreen.nashorn=${tasks.compileJava.destinationDirectory.asFile.get().path}"]
+//compileTestJava {
+//    options.compilerArgs += patchArgs
+//}
+//test {
+//    jvmArgs += patchArgs
+//}

@@ -1,0 +1,40 @@
+plugins {
+    id 'org.beryx.jlink' version '2.22.1'
+}
+
+dependencies {
+    implementation project(':')
+}
+
+application {
+    mainModule = 'io.sqreen.scripting.nashorn.shell'
+    mainClassName = 'io.sqreen.nashorn.tools.jjs.Main'
+}
+
+sourceCompatibility = 14
+targetCompatibility = 14
+
+java {
+    modularity.inferModulePath = true
+}
+
+def addedExports = [
+        'jdk.internal.le/jdk.internal.org.jline.reader',
+        'jdk.internal.le/jdk.internal.org.jline.reader.impl',
+        'jdk.internal.le/jdk.internal.org.jline.reader.impl.completer',
+        'jdk.internal.le/jdk.internal.org.jline.terminal',
+        'jdk.internal.le/jdk.internal.org.jline.keymap',
+        'jdk.internal.ed/jdk.internal.editor.spi',
+]
+
+jlink {
+    options = [/*'--strip-debug',*/ '--compress', '2', '--no-header-files', '--no-man-pages'] +
+            addedExports.collect { "--add-options=\"--add-exports=$it=io.sqreen.scripting.nashorn.shell\"" }
+    launcher {
+        jvmArgs = addedExports.collect { "--add-exports=$it=io.sqreen.scripting.nashorn.shell" }
+    }
+}
+
+compileJava {
+    options.compilerArgs += addedExports.collect { "--add-exports=$it=io.sqreen.scripting.nashorn.shell" }
+}

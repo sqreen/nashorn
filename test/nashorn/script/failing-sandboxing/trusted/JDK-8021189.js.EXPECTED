@@ -1,0 +1,1 @@
+java.security.AccessControlException: access denied ("java.lang.RuntimePermission" "accessClassInPackage.io.sqreen.nashorn.internal.test.models")

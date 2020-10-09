@@ -1,0 +1,29 @@
+plugins {
+    id 'application'
+}
+//mainClassName = "$moduleName/io.sqreen.nashorn.internal.tools.nasgen.Main"
+// in the bundled JPMS support of Gradle:
+application {
+    mainModule = 'io.sqreen.nashorn.nasgen'
+    mainClassName = 'io.sqreen.nashorn.internal.tools.nasgen.Main'
+}
+
+sourceCompatibility = 14
+targetCompatibility = 14
+
+java {
+    modularity.inferModulePath = true
+}
+
+dependencies {
+    implementation project(':asm')
+}
+
+run {
+    if (project.hasProperty('args')) {
+        args = project.args
+    }
+    if (project.hasProperty('workingDir')) {
+        workingDir = project.workingDir
+    }
+}

@@ -1,0 +1,22 @@
+class io.sqreen.nashorn.internal.runtime.DebuggerSupport
+
+static java.lang.Object io.sqreen.nashorn.internal.runtime.DebuggerSupport.eval(io.sqreen.nashorn.internal.runtime.ScriptObject,java.lang.Object,java.lang.String,boolean)
+static io.sqreen.nashorn.internal.runtime.DebuggerSupport$SourceInfo io.sqreen.nashorn.internal.runtime.DebuggerSupport.getSourceInfo(java.lang.Class)
+static void io.sqreen.nashorn.internal.runtime.DebuggerSupport.notifyInvoke(java.lang.invoke.MethodHandle)
+static java.lang.String io.sqreen.nashorn.internal.runtime.DebuggerSupport.valueAsString(java.lang.Object)
+static io.sqreen.nashorn.internal.runtime.DebuggerSupport$DebuggerValueDesc io.sqreen.nashorn.internal.runtime.DebuggerSupport.valueInfo(java.lang.String,java.lang.Object,boolean)
+static io.sqreen.nashorn.internal.runtime.DebuggerSupport$DebuggerValueDesc[] io.sqreen.nashorn.internal.runtime.DebuggerSupport.valueInfos(java.lang.Object,boolean)
+
+class io.sqreen.nashorn.internal.runtime.DebuggerSupport$DebuggerValueDesc
+
+final boolean io.sqreen.nashorn.internal.runtime.DebuggerSupport$DebuggerValueDesc.expandable
+final java.lang.String io.sqreen.nashorn.internal.runtime.DebuggerSupport$DebuggerValueDesc.key
+final java.lang.Object io.sqreen.nashorn.internal.runtime.DebuggerSupport$DebuggerValueDesc.valueAsObject
+final java.lang.String io.sqreen.nashorn.internal.runtime.DebuggerSupport$DebuggerValueDesc.valueAsString
+
+class io.sqreen.nashorn.internal.runtime.DebuggerSupport$SourceInfo
+
+final char[] io.sqreen.nashorn.internal.runtime.DebuggerSupport$SourceInfo.content
+final int io.sqreen.nashorn.internal.runtime.DebuggerSupport$SourceInfo.hash
+final java.lang.String io.sqreen.nashorn.internal.runtime.DebuggerSupport$SourceInfo.name
+final java.net.URL io.sqreen.nashorn.internal.runtime.DebuggerSupport$SourceInfo.url

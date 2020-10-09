@@ -1,0 +1,6 @@
+rootProject.name = 'nashorn'
+include 'nasgen'
+include 'asm'
+include 'jemmy'
+include 'jjs'
+include 'agent'

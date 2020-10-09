@@ -1,0 +1,8 @@
+plugins {
+    id 'java-library'
+}
+
+sourceCompatibility = 14
+targetCompatibility = 14
+
+jar {}

@@ -1,0 +1,8 @@
+plugins {
+    id 'java-library'
+}
+
+// TODO: needed?
+// can we just use --add-exports java.base/jdk.internal.org.objectweb.asm=io.sqreen.nashorn[.test] ?
+sourceCompatibility = 14
+targetCompatibility = 14

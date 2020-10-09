@@ -1,0 +1,29 @@
+plugins {
+    id 'java-library'
+}
+
+jar {
+    manifest {
+        attributes 'Premain-Class': 'io.sqreen.nashorn.agent.Premain',
+                'Can-Redefine-Classes': 'true',
+                'Can-Retransform-Classes': 'true',
+                'Bundle-Version': project.version.toString(),
+                'Bundle-SymbolicName': 'sqreen-nashorn-agent'
+    }
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+compileJava {
+    options.compilerArgs += [
+            '--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED',
+    ]
+}
+
+dependencies {
+    compile group: 'net.bytebuddy', name: 'byte-buddy-dep', version: '1.10.17'
+}
+
+sourceCompatibility = 14
+targetCompatibility = 14
