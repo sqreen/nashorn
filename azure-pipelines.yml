@@ -1,0 +1,45 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: Bash@3
+  displayName: Download OpenJDK 15
+  inputs:
+    targetType: inline
+    script: |
+      set -x
+      mkdir -p $(Agent.BuildDirectory)
+      wget -O - http://sqreen-ci-java.s3.amazonaws.com/openjdk/openjdk-15.tar.xz | \
+        tar -C $(Agent.BuildDirectory) -xJf -
+
+- task: Gradle@2
+  inputs:
+    displayName: Build and run tests
+    gradleWrapperFile: 'gradlew'
+    gradleOptions: '-Xmx3072m'
+    javaHomeOption: 'Path'
+    jdkDirectory: '$(Agent.BuildDirectory)/openjdk-15'
+    jdkArchitectureOption: 'x64'
+    tasks: 'tasks'
+
+- task: Bash@3
+  inputs:
+    targetType: inline
+    script: |
+      find /home/vsts -name gradle-worker.jar
+
+- task: Gradle@2
+  inputs:
+    displayName: Build and run tests
+    gradleWrapperFile: 'gradlew'
+    gradleOptions: '-Xmx3072m'
+    javaHomeOption: 'Path'
+    jdkDirectory: '$(Agent.BuildDirectory)/openjdk-15'
+    jdkArchitectureOption: 'x64'
+    options: '--info'
+    publishJUnitResults: true
+    testResultsFiles: '**/TEST-*.xml'
+    tasks: 'check'
