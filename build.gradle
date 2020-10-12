@@ -57,6 +57,31 @@ sourceSets {
     }
 }
 
+/* exported and opened packages to tests */
+def exportedInternalPackages = [
+        'io.sqreen.nashorn.internal.ir',
+        'io.sqreen.nashorn.internal.codegen',
+        'io.sqreen.nashorn.internal.parser',
+        'io.sqreen.nashorn.internal.objects',
+        'io.sqreen.nashorn.internal.runtime',
+        'io.sqreen.nashorn.internal.runtime.doubleconv',
+        'io.sqreen.nashorn.internal.runtime.linker',
+        'io.sqreen.nashorn.internal.runtime.events',
+        'io.sqreen.nashorn.internal.runtime.options',
+        'io.sqreen.nashorn.internal.runtime.regexp',
+        'io.sqreen.nashorn.internal.runtime.regexp.joni',
+        'io.sqreen.nashorn.tools',
+]
+def openedInternalPackages = [
+        'io.sqreen.nashorn.internal.runtime',
+        'io.sqreen.nashorn.internal.runtime.doubleconv'
+]
+
+compileTestJava {
+    options.compilerArgs += exportedInternalPackages
+            .collect { "--add-exports=io.sqreen.nashorn/$it=io.sqreen.nashorn.test" }
+}
+
 def nasgenOutput = "${project.buildDir}/classes/java/nasgen"
 sourceSets.main.output.dir nasgenOutput
 tasks.create(name: 'runNasgen', type: GradleBuild, dependsOn: compileJava) {
@@ -273,32 +298,7 @@ tasks.withType(Test).each { Task t ->
         if (project.hasProperty('test.js.list')) {
             systemProperty 'test.js.list', project."test.js.list"
         }
-        systemProperties(
-                'file.encoding': 'UTF-8',
-                // TODO somehow automate this. Maybe in script runner copy JVM args from origin JVM
-//                'test.fork.jvm.options': "--module-path ${sourceSets.main.java.outputDir}:" +
-//                        "${sourceSets.test.java.outputDir}:" +
-//                        "${project('asm').tasks['jar'].archivePath}:" +
-//                        ""
-        )
-        def exportedInternalPackages = [
-                'io.sqreen.nashorn.internal.ir',
-                'io.sqreen.nashorn.internal.codegen',
-                'io.sqreen.nashorn.internal.parser',
-                'io.sqreen.nashorn.internal.objects',
-                'io.sqreen.nashorn.internal.runtime',
-                'io.sqreen.nashorn.internal.runtime.doubleconv',
-                'io.sqreen.nashorn.internal.runtime.linker',
-                'io.sqreen.nashorn.internal.runtime.events',
-                'io.sqreen.nashorn.internal.runtime.options',
-                'io.sqreen.nashorn.internal.runtime.regexp',
-                'io.sqreen.nashorn.internal.runtime.regexp.joni',
-                'io.sqreen.nashorn.tools',
-        ]
-        def openedInternalPackages = [
-                'io.sqreen.nashorn.internal.runtime',
-                'io.sqreen.nashorn.internal.runtime.doubleconv'
-        ]
+        systemProperty 'file.encoding', 'UTF-8'
 
         jvmArgs += [
                 '-esa','-ea', // assertions
@@ -317,20 +317,16 @@ tasks.withType(Test).each { Task t ->
         classpath -= sourceSets.test.output
         classpath -= files(nasgenOutput) // already used in patching io.sqreen.nashorn module
 
-//        // add nashorn and asm instead via --upgrade-module-path
-//        modularity.inferModulePath = false
-//        classpath -= sourceSets.main.output
-//        // the jars get on the classpath as well idk how. remove them
-//        def asmJar = project('asm').tasks['jar'].archivePath.path
-//        classpath -= files(tasks['jar'].archivePath)
-//        classpath -= files(asmJar)
-//        jvmArgs += ["--upgrade-module-path=${sourceSets.main.java.outputDir}:" + asmJar]
-//        dependsOn ':asm:jar'
-
-//        jvmArgs += "-javaagent:${project('agent').tasks['jar'].archivePath}"
-//        dependsOn ':agent:jar'
-
         if (t.ext.find('withSecurityManager')) {
+            // not working yet
+            // the point of the agent was to skip the security manager
+            // checks on package loading for the internal package (but not for scripts)
+            // these checks aren't done when nashorn is loaded on the platform CL
+            // instrumenting the SecurityManager doesn't work
+            // Rafael suggested instrumenting AccessControlContext::check
+//            jvmArgs += "-javaagent:${project('agent').tasks['jar'].archivePath}"
+//            dependsOn ':agent:jar'
+
             dependsOn policyResources
             jvmArgs += [
                     '-Djava.security.manager',
