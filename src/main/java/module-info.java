@@ -4,6 +4,7 @@ module io.sqreen.nashorn {
     requires java.logging;
     requires transitive java.scripting;
     requires io.sqreen.nashorn.asm;
+
     exports io.sqreen.nashorn.api.linker;
     exports io.sqreen.nashorn.api.scripting;
     exports io.sqreen.nashorn.api.tree;

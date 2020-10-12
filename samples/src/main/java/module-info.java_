@@ -1,0 +1,9 @@
+import javax.script.ScriptEngineFactory;
+
+module io.sqreen.nashorn.samples {
+    requires java.scripting;
+    requires jdk.dynalink;
+    requires jdk.unsupported;
+
+    uses ScriptEngineFactory;
+}

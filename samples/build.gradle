@@ -1,0 +1,26 @@
+plugins {
+    id 'application'
+}
+dependencies {
+//    compileOnly project(':')
+}
+
+application {
+//    mainModule = 'io.sqreen.nashorn.samples'
+    mainClassName = 'io.sqreen.nashorn.samples.HelloWorldLayer'
+}
+
+run {
+    dependsOn ':jar', ':asm:jar'
+    systemProperty 'nashorn.jar', project(':').tasks['jar'].archivePath
+    systemProperty 'asm.jar', project(':asm').tasks['jar'].archivePath
+}
+
+sourceCompatibility = 14
+targetCompatibility = 14
+
+//java {
+//    modularity.inferModulePath = true
+//}
+
+
