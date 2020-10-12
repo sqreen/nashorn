@@ -1,27 +1,37 @@
+import com.amazonaws.auth.profile.*
 import org.apache.tools.ant.filters.*
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.amazonaws:aws-java-sdk-core:1.11.880'
+    }
+}
 
 plugins {
     id 'java-library'
     id 'de.undercouch.download' version '4.1.1'
 }
 
-version = '14.0.31'
-
 allprojects {
     repositories {
         jcenter()
     }
 
+    group = 'io.sqreen'
+    version = '14.0.31.1'
+
     compileJava {
         options.javaModuleVersion = provider { project.version }
-//        options.compilerArgs += []
     }
 }
 
-sourceCompatibility = 14
-targetCompatibility = 14
-
 java {
+    sourceCompatibility = JavaVersion.VERSION_14
+    targetCompatibility = JavaVersion.VERSION_14
+
     modularity.inferModulePath = true
 }
 
@@ -327,16 +337,71 @@ tasks.withType(Test).each { Task t ->
                     "-Djava.security.policy=${policyDir}/nashorn.policy",
                     "-Djava.security.properties=${policyDir}/nashorn.security.properties",
             ]
-//            systemProperty 'test.fork.jvm.options', forkJvmArgs
         }
         dependsOn runNasgen
     }
 }
 
-//def patchArgs = ['--patch-module', "io.sqreen.nashorn=${tasks.compileJava.destinationDirectory.asFile.get().path}"]
-//compileTestJava {
-//    options.compilerArgs += patchArgs
-//}
-//test {
-//    jvmArgs += patchArgs
-//}
+javadoc {
+    options.tags = ['implNote:a:Implementation Note:',
+                    'implSpec:a:Implementation Requirements:',
+                    'apiNote:a:API Note:']
+}
+
+configure([project(':'), project(':asm')]) {
+    apply plugin: 'ivy-publish'
+    java {
+        withJavadocJar()
+        withSourcesJar()
+    }
+
+    publishing {
+        repositories {
+            ivy {
+                artifactPattern 's3://sqreen-ci-java/jars/[organisation]/[artifact]-[revision](-[classifier]).[ext]'
+                ivyPattern 's3://sqreen-ci-java/jars/[organisation]/[module]-[revision].xml'
+
+                try {
+                    // creds can be in env variables or ~/.aws/{credentials,config}
+                    def creds = new ProfileCredentialsProvider().credentials
+                    credentials(AwsCredentials) {
+                        accessKey = creds.AWSAccessKeyId
+                        secretKey = creds.AWSSecretKey
+                        sessionToken = creds.sessionToken
+                    }
+                } catch (IllegalArgumentException e) {
+                    logger.debug 'No AWS credentials'
+                }
+            }
+        }
+
+    }
+}
+
+publishing {
+    publications {
+        privatePub(IvyPublication) {
+            from components.java
+            descriptor {
+                license {
+                    name = 'GPLv2 with Classpath exceptions'
+                }
+            }
+        }
+    }
+}
+
+configure(project(':asm')) {
+    publishing {
+        publications {
+            privatePub(IvyPublication) {
+                from components.java
+                descriptor {
+                    license {
+                        name = 'GPLv2'
+                    }
+                }
+            }
+        }
+    }
+}
